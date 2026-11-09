@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Multivariate Cloud Workload Analysis"
+type: software
+authors:
+  - family-names: Dogani
+    given-names: Javad
+license: MIT
+repository-code: "https://github.com/JavadDogani/Multivariate-Cloud-workload-analysis"
+abstract: >-
+  Stationarity (ADF, KPSS) and Granger-causality analysis of CPU and memory usage of heavily loaded
+  machines in the Google cluster trace.
+keywords:
+  - cloud-computing
+  - workload-analysis
+  - granger-causality
+  - stationarity-test
+  - google-cluster-data
