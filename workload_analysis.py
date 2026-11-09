@@ -13,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import inspect
 import warnings
 from pathlib import Path
 
@@ -23,6 +24,9 @@ from statsmodels.tsa.stattools import adfuller, grangercausalitytests, kpss
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent / "Workload of Machines with High Utilization"
 DEFAULT_VARIABLES = ["CPU_usage", "Canonical_memory_usage", "Maximum_memory_usage"]
+
+# statsmodels < 0.15 prints the test results unless verbose=False; 0.15 removed the argument.
+_GRANGER_QUIET = {"verbose": False} if "verbose" in inspect.signature(grangercausalitytests).parameters else {}
 
 
 def load_machines(data_dir: Path | str = DEFAULT_DATA_DIR) -> dict[str, pd.DataFrame]:
@@ -36,7 +40,10 @@ def load_machines(data_dir: Path | str = DEFAULT_DATA_DIR) -> dict[str, pd.DataF
 
 def adf_test(series: pd.Series) -> dict[str, float]:
     """Augmented Dickey-Fuller test. Null hypothesis: the series has a unit root (non-stationary)."""
-    stat, p_value, n_lags, _, crit, _ = adfuller(series.to_numpy())
+    try:  # statsmodels >= 0.15 can return a result object; ask for the classic tuple
+        stat, p_value, n_lags, _, crit, _ = adfuller(series.to_numpy(), result_object=False)
+    except TypeError:  # statsmodels < 0.15
+        stat, p_value, n_lags, _, crit, _ = adfuller(series.to_numpy())
     return {"adf_stat": stat, "adf_p": p_value, "adf_lags": n_lags, "adf_crit_5%": crit["5%"]}
 
 
@@ -47,7 +54,10 @@ def kpss_test(series: pd.Series) -> dict[str, float]:
     """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", InterpolationWarning)
-        stat, p_value, n_lags, crit = kpss(series.to_numpy(), regression="c", nlags="auto")
+        try:  # statsmodels >= 0.15 can return a result object; ask for the classic tuple
+            stat, p_value, n_lags, crit = kpss(series.to_numpy(), regression="c", nlags="auto", result_object=False)
+        except TypeError:  # statsmodels < 0.15
+            stat, p_value, n_lags, crit = kpss(series.to_numpy(), regression="c", nlags="auto")
     return {"kpss_stat": stat, "kpss_p": p_value, "kpss_lags": n_lags, "kpss_crit_5%": crit["5%"]}
 
 
@@ -90,7 +100,7 @@ def granger_matrix(
                 continue
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", FutureWarning)
-                res = grangercausalitytests(data[[y, x]], maxlag=max_lag, verbose=False)
+                res = grangercausalitytests(data[[y, x]], maxlag=max_lag, **_GRANGER_QUIET)
             out.loc[y, x] = min(res[lag][0][test][1] for lag in range(1, max_lag + 1))
     out.index = [f"{v}_y" for v in variables]
     out.columns = [f"{v}_x" for v in variables]
